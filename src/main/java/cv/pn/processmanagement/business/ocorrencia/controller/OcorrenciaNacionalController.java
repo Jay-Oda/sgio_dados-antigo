@@ -31,15 +31,24 @@ public class OcorrenciaNacionalController {
             @RequestParam(required = false) String tipologia,
             @RequestParam(required = false) String enquadramento,
             @RequestParam(required = false) Long comando,
-            @RequestParam(required = false) Long unidade) {
+            @RequestParam(required = false) Long unidade,
+            @RequestParam(required = false) String comandoSigla,
+            @RequestParam(required = false) String unidadeSigla,
+            @RequestParam(required = false) Integer offset) {
 
         return ResponseEntity.ok(ocorrenciaNacionalService.listarOcorrencias(
                 page, size, numOcorrencia, tpAuto, estado, dataInicio, dataFim,
-                natureza, tipologia, enquadramento, comando, unidade));
+                natureza, tipologia, enquadramento, comando, unidade,
+                comandoSigla, unidadeSigla, offset));
     }
 
     @GetMapping("/Ocorrencia/opcoes")
     public ResponseEntity<?> opcoes() {
         return ResponseEntity.ok(ocorrenciaNacionalService.obterOpcoes());
+    }
+
+    @GetMapping("/Ocorrencia/historico")
+    public ResponseEntity<APIResponse> historico(@RequestParam String numOcorrencia) {
+        return ResponseEntity.ok(ocorrenciaNacionalService.obterHistorico(numOcorrencia));
     }
 }

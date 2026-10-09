@@ -18,7 +18,12 @@ public interface IOcorrenciaNacionalService {
             String tipologia,
             String enquadramento,
             Long comando,
-            Long unidade);
+            Long unidade,
+            String comandoSigla,
+            String unidadeSigla,
+            Integer offset);
 
     Map<String, Object> obterOpcoes();
+
+    APIResponse obterHistorico(String numOcorrencia);
 }
