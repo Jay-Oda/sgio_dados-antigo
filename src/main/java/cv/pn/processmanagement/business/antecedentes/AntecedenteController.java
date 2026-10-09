@@ -17,9 +17,30 @@ import org.springframework.web.bind.annotation.RestController;
 public class AntecedenteController {
 
     private final IAntecedenteService iAntecedenteService;
+    private final AntecedentesPessoaCache antecedentesPessoaCache;
 
-    public AntecedenteController(IAntecedenteService iAntecedenteService) {
+    public AntecedenteController(IAntecedenteService iAntecedenteService, AntecedentesPessoaCache antecedentesPessoaCache) {
         this.iAntecedenteService = iAntecedenteService;
+        this.antecedentesPessoaCache = antecedentesPessoaCache;
+    }
+
+    /**
+     * Antecedentes no SIGO antigo de uma pessoa vinda do SIGOIC/RNI. O nome, o nome do pai e o nome da mãe
+     * são comparados sem acentos, maiúsculas, espaços repetidos nem ordem dos apelidos (ver AntecedentesPessoaCache).
+     */
+    @GetMapping("/antecedentes")
+    public ResponseEntity<?> antecedentesPorFiliacao(
+            @Parameter(description = "Nome da pessoa") @RequestParam String nome,
+            @Parameter(description = "Nome do pai") @RequestParam(required = false) String pai,
+            @Parameter(description = "Nome da mãe") @RequestParam(required = false) String mae,
+            @Parameter(description = "Data de nascimento (ex.: 2002-01-22); se as duas existirem, têm de ser iguais")
+            @RequestParam(required = false) String dataNascimento) {
+        return ResponseEntity.ok(antecedentesPessoaCache.pesquisar(nome, pai, mae, dataNascimento));
+    }
+
+    @GetMapping("/antecedentes/cache")
+    public ResponseEntity<?> estadoCacheAntecedentes() {
+        return ResponseEntity.ok(antecedentesPessoaCache.estado());
     }
 
 

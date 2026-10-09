@@ -154,7 +154,9 @@ public class OcorrenciaNacionalCache {
             log.info("Cache da ocorrência nacional (SIGO antigo) carregada: {} ocorrências em {} ms", novas.size(), duracaoUltimaCargaMs);
         } catch (Exception e) {
             ultimoErro = e.getMessage();
-            log.error("Falha ao carregar a cache da ocorrência nacional; a listagem continua a usar a base de dados", e);
+            log.error("Falha ao carregar a cache da ocorrência nacional; a listagem continua a usar a base de dados e há nova tentativa dentro de 1 minuto", e);
+            // A ligação à base de teste cai de vez em quando: não esperar pela atualização de hora a hora
+            agendador.schedule(this::carregarSemFalhar, 1, TimeUnit.MINUTES);
         } finally {
             aCarregar = false;
         }
