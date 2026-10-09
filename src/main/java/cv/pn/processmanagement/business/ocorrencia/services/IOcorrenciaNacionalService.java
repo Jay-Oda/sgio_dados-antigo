@@ -26,4 +26,6 @@ public interface IOcorrenciaNacionalService {
     Map<String, Object> obterOpcoes();
 
     APIResponse obterHistorico(String numOcorrencia);
+
+    Map<String, Object> estadoCache();
 }

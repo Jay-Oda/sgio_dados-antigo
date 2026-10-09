@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -48,9 +49,17 @@ public class OcorrenciaNacionalService implements IOcorrenciaNacionalService {
     private final Map<String, long[]> cacheTotais = new ConcurrentHashMap<>();
 
     private final SgoOcorrenciaRepository sgoOcorrenciaRepository;
+    private final OcorrenciaNacionalCache ocorrenciaNacionalCache;
 
-    public OcorrenciaNacionalService(SgoOcorrenciaRepository sgoOcorrenciaRepository) {
+    public OcorrenciaNacionalService(SgoOcorrenciaRepository sgoOcorrenciaRepository,
+                                     OcorrenciaNacionalCache ocorrenciaNacionalCache) {
         this.sgoOcorrenciaRepository = sgoOcorrenciaRepository;
+        this.ocorrenciaNacionalCache = ocorrenciaNacionalCache;
+    }
+
+    @Override
+    public Map<String, Object> estadoCache() {
+        return ocorrenciaNacionalCache.estado();
     }
 
     @Override
@@ -87,6 +96,21 @@ public class OcorrenciaNacionalService implements IOcorrenciaNacionalService {
             String dataFimSql = normalizarDataHora(dataFim);
             String comandoSiglaFiltro = textoOuNulo(comandoSigla);
             String unidadeSiglaFiltro = textoOuNulo(unidadeSigla);
+
+            // Com a cache pronta, a pesquisa é feita em memória (milissegundos); senão usa a base como antes
+            Optional<OcorrenciaNacionalCache.Resultado> daCache = ocorrenciaNacionalCache.pesquisar(
+                    numFiltro == null ? null : numOcorrencia.trim(), tpAuto, estadoFiltro, dataInicioSql, dataFimSql,
+                    natureza, tipologia, enquadramento, comando, unidade,
+                    comandoSiglaFiltro, unidadeSiglaFiltro, deslocamento, tamanho);
+            if (daCache.isPresent()) {
+                long totalCache = daCache.get().getTotal();
+                return new APIResponse.buildAPIResponse()
+                        .setStatus(true)
+                        .setStatusText("Ocorrências encontradas com sucesso")
+                        .setDetails(new ArrayList<>(daCache.get().getRegistos()))
+                        .setPagination(new Pagination(pagina, tamanho, (int) Math.ceil((double) totalCache / tamanho), totalCache))
+                        .builder();
+            }
 
             List<OcorrenciaNacionalProjection> registos = sgoOcorrenciaRepository.buscarOcorrenciasNacionais(
                     numFiltro, tpAuto, estadoFiltro, dataInicioSql, dataFimSql,

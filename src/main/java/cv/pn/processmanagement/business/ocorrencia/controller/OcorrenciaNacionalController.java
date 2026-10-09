@@ -47,6 +47,11 @@ public class OcorrenciaNacionalController {
         return ResponseEntity.ok(ocorrenciaNacionalService.obterOpcoes());
     }
 
+    @GetMapping("/Ocorrencia/cache")
+    public ResponseEntity<?> estadoCache() {
+        return ResponseEntity.ok(ocorrenciaNacionalService.estadoCache());
+    }
+
     @GetMapping("/Ocorrencia/historico")
     public ResponseEntity<APIResponse> historico(@RequestParam String numOcorrencia) {
         return ResponseEntity.ok(ocorrenciaNacionalService.obterHistorico(numOcorrencia));
