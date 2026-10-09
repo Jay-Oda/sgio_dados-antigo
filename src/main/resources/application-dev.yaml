@@ -1,0 +1,83 @@
+server:
+  port: 8083
+
+logging:
+  file:
+    name: default.log
+    path: .
+
+spring:
+  config:
+    activate:
+      on-profile: dev
+  application:
+    name: default_app
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://10.72.208.91:32041/sigo
+    username: postgres
+    password: ssVLKUi9ha
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    generate-ddl: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    defer-datasource-initialization: false
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  rabbitmq:
+    host: 10.72.208.91
+    port: 31822
+    username: user
+    password: 1hQ1n6Z5p5WnkKN4
+
+# springdoc api configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /api/docs.html
+    operations-sorter: method
+
+# Basic Security
+access:
+  username: sigo
+  password: sigo
+  swagger: http://localhost:8082/api/swagger-ui/index.html
+
+# link external
+link:
+  notification:
+    host: http://10.73.225.19:8080/SendingNotification/notification
+    token: cG4ubm90aWZpY2F0aW9uLnNlcnZpY2U6WD50Qm5YcnNONVlMVmRkOA==
+
+  bi:
+    host:
+    token:
+
+  rni:
+    host:
+    token:
+
+  company:
+    host:
+    token:
+
+
+notification:
+  email:
+    default-email-sender: pnotifica@policianacional.cv
+    default-origin: PN_SIGO
+  sms:
+    default-origin: PN_SIGOIC
+    ##default-source: Policia_Nac
+    default-source: PN
