@@ -79,7 +79,7 @@ WITH pagina AS MATERIALIZED (
       AND (:unidade IS NULL OR e.oracle_id = :unidade OR o.id_comando = :unidade)
       AND (:comandoSigla IS NULL OR cmd.sigla = :comandoSigla)
       AND (:unidadeSigla IS NULL OR e.sigla = :unidadeSigla)
-    ORDER BY o.data_registo DESC
+    ORDER BY o.data_registo DESC, o.oracle_id DESC
     OFFSET :offset
     LIMIT :size
 ),
@@ -169,7 +169,7 @@ SELECT
 FROM pagina p
 LEFT JOIN autuantes au ON au.id_agente = p.id_agente
 LEFT JOIN prazos pz ON pz.oracle_id = p.oracle_id
-ORDER BY p.data_registo DESC
+ORDER BY p.data_registo DESC, p.oracle_id DESC
 """, nativeQuery = true)
     List<OcorrenciaNacionalProjection> buscarOcorrenciasNacionais(
             @Param("numOcorrencia") String numOcorrencia,
