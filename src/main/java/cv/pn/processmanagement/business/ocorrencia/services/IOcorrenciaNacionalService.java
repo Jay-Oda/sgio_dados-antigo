@@ -16,6 +16,7 @@ public interface IOcorrenciaNacionalService {
             String dataFim,
             String natureza,
             String tipologia,
+            String tipologiaSemelhante,
             String enquadramento,
             Long comando,
             Long unidade,

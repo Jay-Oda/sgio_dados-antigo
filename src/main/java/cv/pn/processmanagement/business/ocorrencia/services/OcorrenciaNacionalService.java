@@ -14,6 +14,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,6 +73,7 @@ public class OcorrenciaNacionalService implements IOcorrenciaNacionalService {
                                          String dataFim,
                                          String natureza,
                                          String tipologia,
+                                         String tipologiaSemelhante,
                                          String enquadramento,
                                          Long comando,
                                          Long unidade,
@@ -97,10 +99,26 @@ public class OcorrenciaNacionalService implements IOcorrenciaNacionalService {
             String comandoSiglaFiltro = textoOuNulo(comandoSigla);
             String unidadeSiglaFiltro = textoOuNulo(unidadeSigla);
 
+            // Tipologia escolhida no SIGOIC: tipologias do SIGO antigo com nome semelhante (80%, sem acentos
+            // nem maiúsculas). Se nenhuma for semelhante, não há ocorrências do SIGO antigo para mostrar.
+            Set<String> tipologiasAceites = null;
+            String nomeTipologia = textoOuNulo(tipologiaSemelhante);
+            if (nomeTipologia != null) {
+                Collection<String> conhecidas = ocorrenciaNacionalCache.tipologiasConhecidas().isPresent()
+                        ? ocorrenciaNacionalCache.tipologiasConhecidas().get()
+                        : sgoOcorrenciaRepository.buscarTipologias();
+                tipologiasAceites = conhecidas.stream()
+                        .filter(nome -> SemelhancaTexto.semelhantes(nomeTipologia, nome))
+                        .collect(Collectors.toSet());
+                if (tipologiasAceites.isEmpty()) {
+                    return semResultados(pagina, tamanho);
+                }
+            }
+
             // Com a cache pronta, a pesquisa é feita em memória (milissegundos); senão usa a base como antes
             Optional<OcorrenciaNacionalCache.Resultado> daCache = ocorrenciaNacionalCache.pesquisar(
                     numFiltro == null ? null : numOcorrencia.trim(), tpAuto, estadoFiltro, dataInicioSql, dataFimSql,
-                    natureza, tipologia, enquadramento, comando, unidade,
+                    natureza, tipologia, tipologiasAceites, enquadramento, comando, unidade,
                     comandoSiglaFiltro, unidadeSiglaFiltro, deslocamento, tamanho);
             if (daCache.isPresent()) {
                 long totalCache = daCache.get().getTotal();
@@ -110,6 +128,22 @@ public class OcorrenciaNacionalService implements IOcorrenciaNacionalService {
                         .setDetails(new ArrayList<>(daCache.get().getRegistos()))
                         .setPagination(new Pagination(pagina, tamanho, (int) Math.ceil((double) totalCache / tamanho), totalCache))
                         .builder();
+            }
+
+            // Sem a cache, a query SQL só filtra por um nome de tipologia
+            if (tipologiasAceites != null) {
+                String unica = tipologiasAceites.iterator().next();
+                if (tipologiasAceites.size() > 1) {
+                    return new APIResponse.buildAPIResponse()
+                            .setStatus(false)
+                            .setStatusText("Os dados do SIGO antigo ainda estão a carregar")
+                            .setDetails(Collections.emptyList())
+                            .builder();
+                }
+                if (tipologia != null && !tipologia.equals(unica)) {
+                    return semResultados(pagina, tamanho);
+                }
+                tipologia = unica;
             }
 
             List<OcorrenciaNacionalProjection> registos = sgoOcorrenciaRepository.buscarOcorrenciasNacionais(
@@ -339,6 +373,15 @@ public class OcorrenciaNacionalService implements IOcorrenciaNacionalService {
 
     private boolean temValor(String valor) {
         return valor != null && !valor.trim().isEmpty();
+    }
+
+    private APIResponse semResultados(int pagina, int tamanho) {
+        return new APIResponse.buildAPIResponse()
+                .setStatus(true)
+                .setStatusText("Ocorrências encontradas com sucesso")
+                .setDetails(Collections.emptyList())
+                .setPagination(new Pagination(pagina, tamanho, 0, 0L))
+                .builder();
     }
 
     private String textoOuNulo(String valor) {

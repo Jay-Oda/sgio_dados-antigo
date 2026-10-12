@@ -109,6 +109,8 @@ public class OcorrenciaNacionalCache {
     private volatile List<Entrada> entradas;
     // Número da ocorrência -> oracle_id (com índice), usado para acelerar o detalhe da ocorrência
     private volatile Map<String, Long> oracleIdPorNumero;
+    // Nomes de todas as tipologias usadas nas ocorrências (para a pesquisa por tipologia semelhante)
+    private volatile Set<String> tipologiasConhecidas;
     private volatile Date carregadoEm;
     private volatile long duracaoUltimaCargaMs;
     private volatile String ultimoErro;
@@ -151,6 +153,7 @@ public class OcorrenciaNacionalCache {
             List<Entrada> novas = carregar();
             entradas = novas;
             oracleIdPorNumero = indicePorNumero(novas);
+            tipologiasConhecidas = tipologiasUsadas(novas);
             carregadoEm = new Date();
             duracaoUltimaCargaMs = System.currentTimeMillis() - inicio;
             ultimoErro = null;
@@ -265,8 +268,8 @@ public class OcorrenciaNacionalCache {
      * (nesse caso a listagem usa a base de dados, como antes).
      */
     public Optional<Resultado> pesquisar(String numFiltro, String tpAuto, String estados, String dataInicio, String dataFim,
-                                         String natureza, String tipologia, String enquadramento,
-                                         Long comando, Long unidade, String comandoSigla, String unidadeSigla,
+                                         String natureza, String tipologia, Set<String> tipologiasAceites,
+                                         String enquadramento, Long comando, Long unidade, String comandoSigla, String unidadeSigla,
                                          int offset, int tamanho) {
         List<Entrada> todas = entradas;
         if (todas == null) {
@@ -301,6 +304,7 @@ public class OcorrenciaNacionalCache {
             if (fim != null && e.dataLocal.isAfter(fim)) continue;
             if (natureza != null && !e.naturezasFiltro.contains(natureza)) continue;
             if (tipologia != null && !e.tipologiasFiltro.contains(tipologia)) continue;
+            if (tipologiasAceites != null && Collections.disjoint(tipologiasAceites, e.tipologiasFiltro)) continue;
             if (enquadramento != null && !e.enquadramentosFiltro.contains(enquadramento)) continue;
             if (comando != null && !comando.equals(e.comandoId)) continue;
             if (unidade != null && !unidade.equals(e.unidadeId) && !unidade.equals(e.idComando)) continue;
@@ -314,6 +318,20 @@ public class OcorrenciaNacionalCache {
         }
 
         return Optional.of(new Resultado(encontradas, total));
+    }
+
+    /** Nomes das tipologias usadas nas ocorrências (vazio se a cache ainda não estiver pronta). */
+    public Optional<Set<String>> tipologiasConhecidas() {
+        return Optional.ofNullable(tipologiasConhecidas);
+    }
+
+    private static Set<String> tipologiasUsadas(List<Entrada> lista) {
+        Set<String> nomes = new HashSet<>();
+        for (Entrada e : lista) {
+            nomes.addAll(e.tipologiasFiltro);
+        }
+        nomes.remove(null);
+        return Collections.unmodifiableSet(nomes);
     }
 
     /** oracle_id da ocorrência com este número (vazio se a cache não estiver pronta ou o número for repetido). */

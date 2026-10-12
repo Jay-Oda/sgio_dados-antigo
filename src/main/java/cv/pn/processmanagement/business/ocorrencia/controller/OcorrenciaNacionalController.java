@@ -29,6 +29,8 @@ public class OcorrenciaNacionalController {
             @RequestParam(required = false) String dataFim,
             @RequestParam(required = false) String natureza,
             @RequestParam(required = false) String tipologia,
+            // Nome da tipologia escolhida no SIGOIC: aceita as tipologias do SIGO antigo com nome semelhante
+            @RequestParam(required = false) String tipologiaSemelhante,
             @RequestParam(required = false) String enquadramento,
             @RequestParam(required = false) Long comando,
             @RequestParam(required = false) Long unidade,
@@ -38,7 +40,7 @@ public class OcorrenciaNacionalController {
 
         return ResponseEntity.ok(ocorrenciaNacionalService.listarOcorrencias(
                 page, size, numOcorrencia, tpAuto, estado, dataInicio, dataFim,
-                natureza, tipologia, enquadramento, comando, unidade,
+                natureza, tipologia, tipologiaSemelhante, enquadramento, comando, unidade,
                 comandoSigla, unidadeSigla, offset));
     }
 
