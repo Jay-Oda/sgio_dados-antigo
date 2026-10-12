@@ -107,6 +107,8 @@ public class OcorrenciaNacionalCache {
     });
 
     private volatile List<Entrada> entradas;
+    // Número da ocorrência -> oracle_id (com índice), usado para acelerar o detalhe da ocorrência
+    private volatile Map<String, Long> oracleIdPorNumero;
     private volatile Date carregadoEm;
     private volatile long duracaoUltimaCargaMs;
     private volatile String ultimoErro;
@@ -148,6 +150,7 @@ public class OcorrenciaNacionalCache {
         try {
             List<Entrada> novas = carregar();
             entradas = novas;
+            oracleIdPorNumero = indicePorNumero(novas);
             carregadoEm = new Date();
             duracaoUltimaCargaMs = System.currentTimeMillis() - inicio;
             ultimoErro = null;
@@ -311,6 +314,29 @@ public class OcorrenciaNacionalCache {
         }
 
         return Optional.of(new Resultado(encontradas, total));
+    }
+
+    /** oracle_id da ocorrência com este número (vazio se a cache não estiver pronta ou o número for repetido). */
+    public Optional<Long> oracleIdPorNumero(String numOcorrencia) {
+        Map<String, Long> indice = oracleIdPorNumero;
+        if (indice == null || numOcorrencia == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(indice.get(numOcorrencia.trim()));
+    }
+
+    private static Map<String, Long> indicePorNumero(List<Entrada> lista) {
+        Map<String, Long> indice = new HashMap<>();
+        Set<String> repetidos = new HashSet<>();
+        for (Entrada e : lista) {
+            if (e.numOcorrencia == null) continue;
+            Long anterior = indice.put(e.numOcorrencia, e.oracleId);
+            if (anterior != null && anterior != e.oracleId) {
+                repetidos.add(e.numOcorrencia);
+            }
+        }
+        repetidos.forEach(indice::remove);
+        return indice;
     }
 
     private LocalDateTime lerData(String valor) {

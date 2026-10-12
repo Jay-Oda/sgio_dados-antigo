@@ -11,6 +11,7 @@ import cv.pn.processmanagement.business.projection.PessoaDetalheProjection;
 import cv.pn.processmanagement.business.projection.PessoaEnvolvedaProjection;
 import cv.pn.processmanagement.business.projection.PessoaOcorrenciaProjection;
 import cv.pn.processmanagement.business.projection.PessoaResumoProjection;
+import cv.pn.processmanagement.business.ocorrencia.services.OcorrenciaNacionalCache;
 import cv.pn.processmanagement.business.sigoOcorrenciaPessoa.repository.SgoOcorrenciaPessoaRepository;
 import cv.pn.processmanagement.business.sigoPessoa.repository.SigoPessoaRepository;
 import cv.pn.processmanagement.sgoPecaPessoa.repository.SgoPecaPessoaRepository;
@@ -42,13 +43,16 @@ public class AntecedenteService implements IAntecedenteService {
     private final SgoOcorrenciaPessoaRepository sgoOcorrenciaPessoaRepository;
     private final SgoPecaPessoaRepository sgoPecaPessoaRepository;
     private final SigoPessoaRepository sigoPessoaRepository;
+    private final OcorrenciaNacionalCache ocorrenciaNacionalCache;
 
     public AntecedenteService(SgoOcorrenciaPessoaRepository sgoOcorrenciaPessoaRepository,
                               SgoPecaPessoaRepository sgoPecaPessoaRepository,
-                              SigoPessoaRepository sigoPessoaRepository) {
+                              SigoPessoaRepository sigoPessoaRepository,
+                              OcorrenciaNacionalCache ocorrenciaNacionalCache) {
         this.sgoOcorrenciaPessoaRepository = sgoOcorrenciaPessoaRepository;
         this.sgoPecaPessoaRepository = sgoPecaPessoaRepository;
         this.sigoPessoaRepository = sigoPessoaRepository;
+        this.ocorrenciaNacionalCache = ocorrenciaNacionalCache;
     }
 
     @Override
@@ -935,8 +939,12 @@ public class AntecedenteService implements IAntecedenteService {
                     .builder();
         }
 
-        List<OcorrenciaDetalheProjection> ocorrencias =
-                sgoOcorrenciaPessoaRepository.detalharPorNumOcorrencia(numOcorrencia.trim());
+        // Pelo oracle_id (com índice) quando a cache da listagem o conhece; senão pelo número, como antes
+        Optional<Long> oracleId = ocorrenciaNacionalCache.oracleIdPorNumero(numOcorrencia.trim());
+
+        List<OcorrenciaDetalheProjection> ocorrencias = oracleId.isPresent()
+                ? sgoOcorrenciaPessoaRepository.detalharPorOracleId(oracleId.get())
+                : sgoOcorrenciaPessoaRepository.detalharPorNumOcorrencia(numOcorrencia.trim());
 
         if (ocorrencias.isEmpty()) {
             return new APIResponse.buildAPIResponse()
@@ -966,8 +974,9 @@ public class AntecedenteService implements IAntecedenteService {
             item.put("local", r.getLocal() != null ? r.getLocal() : "");
 
             List<Map<String, Object>> envolvidos = new ArrayList<>();
-            List<PessoaEnvolvedaProjection> pessoasEnv =
-                    sgoOcorrenciaPessoaRepository.buscarPessoasPorNumOcorrencia(numOcorrencia.trim());
+            List<PessoaEnvolvedaProjection> pessoasEnv = oracleId.isPresent()
+                    ? sgoOcorrenciaPessoaRepository.buscarPessoasPorOracleId(oracleId.get())
+                    : sgoOcorrenciaPessoaRepository.buscarPessoasPorNumOcorrencia(numOcorrencia.trim());
 
             for (PessoaEnvolvedaProjection pe : pessoasEnv) {
                 String condicao = pe.getCondicao();
