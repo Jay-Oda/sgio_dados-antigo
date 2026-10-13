@@ -52,7 +52,7 @@ springdoc:
 access:
   username: sigo
   password: sigo
-  swagger: http://localhost:8082/api/swagger-ui/index.html
+  swagger: http://localhost:8084/api/swagger-ui/index.html
 
 # link external
 link:

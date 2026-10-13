@@ -20,4 +20,10 @@ public class HomePageController {
 
     }
 
+    /** http://localhost:{porta}/ abre o Swagger; sem sessão, o Spring Security pede primeiro o login. */
+    @RequestMapping("/")
+    public String raiz() {
+        return "redirect:/api/swagger-ui/index.html";
+    }
+
 }
