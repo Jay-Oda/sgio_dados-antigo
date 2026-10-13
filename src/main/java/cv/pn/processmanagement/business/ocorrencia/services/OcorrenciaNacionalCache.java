@@ -1,5 +1,6 @@
 package cv.pn.processmanagement.business.ocorrencia.services;
 
+import cv.pn.processmanagement.business.CargaSigoAntigo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -147,6 +148,16 @@ public class OcorrenciaNacionalCache {
     }
 
     private void carregarSemFalhar() {
+        // Uma carga pesada de cada vez (ver CargaSigoAntigo)
+        CargaSigoAntigo.UMA_DE_CADA_VEZ.lock();
+        try {
+            carregarAgora();
+        } finally {
+            CargaSigoAntigo.UMA_DE_CADA_VEZ.unlock();
+        }
+    }
+
+    private void carregarAgora() {
         aCarregar = true;
         long inicio = System.currentTimeMillis();
         try {
@@ -170,7 +181,7 @@ public class OcorrenciaNacionalCache {
 
     private List<Entrada> carregar() {
         Map<Long, Tipos> tipos = new HashMap<>();
-        jdbcTemplate.query(SQL_TIPOS, rs -> {
+        CargaSigoAntigo.consultarEmBlocos(jdbcTemplate, SQL_TIPOS, rs -> {
             Tipos t = new Tipos();
             t.naturezas = rs.getString("naturezas");
             t.tipologias = rs.getString("tipologias");
@@ -182,13 +193,13 @@ public class OcorrenciaNacionalCache {
         });
 
         Map<Long, String> autuantes = new HashMap<>();
-        jdbcTemplate.query(SQL_AUTUANTES, rs -> {
+        CargaSigoAntigo.consultarEmBlocos(jdbcTemplate, SQL_AUTUANTES, rs -> {
             autuantes.put(rs.getLong("id_agente"), rs.getString("nome"));
         });
 
         Map<Long, List<Processo>> processosPorId = new HashMap<>();
         Map<String, List<Processo>> processosPorNumero = new HashMap<>();
-        jdbcTemplate.query(SQL_PROCESSOS, rs -> {
+        CargaSigoAntigo.consultarEmBlocos(jdbcTemplate, SQL_PROCESSOS, rs -> {
             Processo p = new Processo();
             p.prazo = rs.getString("prazo");
             p.dataRegisto = rs.getTimestamp("data_registo", utc());
@@ -203,7 +214,7 @@ public class OcorrenciaNacionalCache {
         });
 
         List<Entrada> lista = new ArrayList<>(110_000);
-        jdbcTemplate.query(SQL_OCORRENCIAS, rs -> {
+        CargaSigoAntigo.consultarEmBlocos(jdbcTemplate, SQL_OCORRENCIAS, rs -> {
             lista.add(criarEntrada(rs, tipos, autuantes, processosPorId, processosPorNumero));
         });
 

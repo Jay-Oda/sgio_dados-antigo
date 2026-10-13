@@ -1,5 +1,6 @@
 package cv.pn.processmanagement.business.antecedentes;
 
+import cv.pn.processmanagement.business.CargaSigoAntigo;
 import cv.pn.processmanagement.business.ocorrencia.services.SemelhancaTexto;
 import cv.pn.processmanagement.utilities.APIResponse;
 import org.slf4j.Logger;
@@ -128,10 +129,20 @@ public class AntecedentesPessoaCache {
     }
 
     private void carregarSemFalhar() {
+        // Uma carga pesada de cada vez (ver CargaSigoAntigo)
+        CargaSigoAntigo.UMA_DE_CADA_VEZ.lock();
+        try {
+            carregarAgora();
+        } finally {
+            CargaSigoAntigo.UMA_DE_CADA_VEZ.unlock();
+        }
+    }
+
+    private void carregarAgora() {
         long inicio = System.currentTimeMillis();
         try {
             Map<Long, Pessoa> porId = new HashMap<>();
-            jdbcTemplate.query(SQL_ANTECEDENTES, rs -> {
+            CargaSigoAntigo.consultarEmBlocos(jdbcTemplate, SQL_ANTECEDENTES, rs -> {
                 long id = rs.getLong("pessoa_id");
                 Pessoa p = porId.get(id);
                 if (p == null) {
