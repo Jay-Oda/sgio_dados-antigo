@@ -75,7 +75,7 @@ link:
 # Gerador de PDF (GeneratorPdfJasperRiporter), como no SIGOIC
 api:
   token-pdf: UE5NUzpQTkRFViNNUyMyMw==
-  host-pdf: http://localhost:8098/sigo-pdf/
+  host-pdf: http://localhost:8088/sigo-pdf/
 
 notification:
   email:
