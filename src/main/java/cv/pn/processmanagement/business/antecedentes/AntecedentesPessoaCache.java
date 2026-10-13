@@ -1,5 +1,6 @@
 package cv.pn.processmanagement.business.antecedentes;
 
+import cv.pn.processmanagement.business.ocorrencia.services.SemelhancaTexto;
 import cv.pn.processmanagement.utilities.APIResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -41,6 +43,10 @@ import java.util.concurrent.TimeUnit;
  * reduzido ao conjunto das suas palavras (sem acentos, em maiúsculas, sem partículas de/da/do/das/dos/e)
  * e a pessoa só é considerada a mesma quando o nome, o nome do pai e o nome da mãe coincidem.
  * Se as duas datas de nascimento existirem, também têm de ser iguais.
+ *
+ * Erros de digitação no nome da pessoa ("Ivam" no RNI, "YVAM" no SIGO antigo): quando o pai e a mãe
+ * coincidem e a data de nascimento existe nos dois lados e é igual, basta o nome ser pelo menos 80% igual.
+ * Sem data de nascimento, o nome tem de ter as mesmas palavras.
  *
  * Contam como antecedentes as mesmas condições do endpoint busca/antecidente: Denunciado (Auto de
  * Denúncia), Detido (Auto de Detenção, condição 5) e Denunciado/Autor (Auto de Denúncia VBG).
@@ -89,6 +95,8 @@ public class AntecedentesPessoaCache {
 
     /** Chave = palavras do nome da pessoa; valor = pessoas do SIGO antigo com esse nome. */
     private volatile Map<String, List<Pessoa>> pessoasPorNome;
+    /** Chave = pai + mãe + data de nascimento; usado para aceitar erros de digitação no nome da pessoa. */
+    private volatile Map<String, List<Pessoa>> pessoasPorPaisENascimento;
     private volatile int totalPessoas;
     private volatile java.util.Date carregadoEm;
     private volatile long duracaoUltimaCargaMs;
@@ -129,6 +137,7 @@ public class AntecedentesPessoaCache {
                 if (p == null) {
                     p = new Pessoa();
                     p.chaveNome = chave(rs.getString("nome"));
+                    p.nomePorOrdem = nomePorOrdem(rs.getString("nome"));
                     p.chavePai = chave(rs.getString("pai"));
                     p.chaveMae = chave(rs.getString("mae"));
                     Date nasc = rs.getDate("dt_nascimento");
@@ -148,12 +157,18 @@ public class AntecedentesPessoaCache {
             });
 
             Map<String, List<Pessoa>> indice = new HashMap<>();
+            Map<String, List<Pessoa>> indicePaisENascimento = new HashMap<>();
             for (Pessoa p : porId.values()) {
                 if (!p.chaveNome.isEmpty()) {
                     indice.computeIfAbsent(p.chaveNome, k -> new ArrayList<>()).add(p);
                 }
+                if (!p.chavePai.isEmpty() && !p.chaveMae.isEmpty() && p.dataNascimento != null) {
+                    indicePaisENascimento.computeIfAbsent(chavePaisENascimento(p.chavePai, p.chaveMae, p.dataNascimento),
+                            k -> new ArrayList<>()).add(p);
+                }
             }
 
+            pessoasPorPaisENascimento = indicePaisENascimento;
             pessoasPorNome = indice;
             totalPessoas = porId.size();
             carregadoEm = new java.util.Date();
@@ -184,10 +199,24 @@ public class AntecedentesPessoaCache {
 
         // Junta os antecedentes de todas as pessoas que coincidem, agrupados por ocorrência (como busca/antecidente)
         Map<String, Map<String, Object>> porOcorrencia = new LinkedHashMap<>();
-        List<Linha> linhas = new ArrayList<>();
+        Set<Pessoa> encontradas = new LinkedHashSet<>();
         for (Pessoa p : indice.getOrDefault(chaveNome, Collections.emptyList())) {
             if (!chavePai.equals(p.chavePai) || !chaveMae.equals(p.chaveMae)) continue;
             if (nascimento != null && p.dataNascimento != null && !nascimento.equals(p.dataNascimento)) continue;
+            encontradas.add(p);
+        }
+        // Pai, mãe e data de nascimento iguais: aceita erros de digitação no nome (pelo menos 80% igual)
+        if (nascimento != null && pessoasPorPaisENascimento != null) {
+            String nomeRecebido = nomePorOrdem(nome);
+            for (Pessoa p : pessoasPorPaisENascimento.getOrDefault(
+                    chavePaisENascimento(chavePai, chaveMae, nascimento), Collections.emptyList())) {
+                if (nomesSemelhantes(nomeRecebido, chaveNome, p)) {
+                    encontradas.add(p);
+                }
+            }
+        }
+        List<Linha> linhas = new ArrayList<>();
+        for (Pessoa p : encontradas) {
             linhas.addAll(p.linhas);
         }
         linhas.sort((a, b) -> {
@@ -220,14 +249,32 @@ public class AntecedentesPessoaCache {
 
     /** Palavras do nome, sem acentos, em maiúsculas, sem partículas e ordenadas (a ordem dos apelidos não conta). */
     static String chave(String nome) {
-        if (nome == null) return "";
+        return String.join(" ", new TreeSet<>(palavras(nome)));
+    }
+
+    /** As mesmas palavras de chave(), mas pela ordem em que estão escritas. */
+    static String nomePorOrdem(String nome) {
+        return String.join(" ", palavras(nome));
+    }
+
+    private static List<String> palavras(String nome) {
+        List<String> lista = new ArrayList<>();
+        if (nome == null) return lista;
         String semAcentos = Normalizer.normalize(nome, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
-        String[] palavras = semAcentos.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", " ").trim().split(" ");
-        Set<String> conjunto = new TreeSet<>();
-        for (String p : palavras) {
-            if (!p.isEmpty() && !PARTICULAS.contains(p)) conjunto.add(p);
+        for (String p : semAcentos.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", " ").trim().split(" ")) {
+            if (!p.isEmpty() && !PARTICULAS.contains(p)) lista.add(p);
         }
-        return String.join(" ", conjunto);
+        return lista;
+    }
+
+    /** Nome pelo menos 80% igual, comparando pela ordem escrita ou pelas palavras ordenadas (apelidos trocados). */
+    private static boolean nomesSemelhantes(String nomeRecebidoPorOrdem, String chaveNomeRecebido, Pessoa p) {
+        return SemelhancaTexto.semelhanca(nomeRecebidoPorOrdem, p.nomePorOrdem) >= SemelhancaTexto.SEMELHANCA_MINIMA
+                || SemelhancaTexto.semelhanca(chaveNomeRecebido, p.chaveNome) >= SemelhancaTexto.SEMELHANCA_MINIMA;
+    }
+
+    private static String chavePaisENascimento(String chavePai, String chaveMae, LocalDate nascimento) {
+        return chavePai + "|" + chaveMae + "|" + nascimento;
     }
 
     private static LocalDate lerData(String valor) {
@@ -281,6 +328,7 @@ public class AntecedentesPessoaCache {
 
     private static final class Pessoa {
         String chaveNome;
+        String nomePorOrdem;
         String chavePai;
         String chaveMae;
         LocalDate dataNascimento;
