@@ -929,8 +929,38 @@ public class AntecedenteService implements IAntecedenteService {
                 .builder();
     }
 
+    /*
+     * Detalhes já consultados (o SIGO antigo é só de consulta). A consulta das pessoas envolvidas demora
+     * 5 a 13 s na base de teste; assim o PDF, pedido logo a seguir à página de detalhes, não a repete.
+     */
+    private static final int MAXIMO_DETALHES_EM_CACHE = 200;
+    private static final long VALIDADE_DETALHE_MS = 30 * 60 * 1000L;
+    private final Map<String, Object[]> cacheDetalhes = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Object[]> maisAntigo) {
+            return size() > MAXIMO_DETALHES_EM_CACHE;
+        }
+    };
+
     @Override
     public Object detalharOcorrencia(String numOcorrencia) {
+        String chave = numOcorrencia == null ? "" : numOcorrencia.trim();
+        synchronized (cacheDetalhes) {
+            Object[] guardado = cacheDetalhes.get(chave);
+            if (guardado != null && System.currentTimeMillis() - (Long) guardado[0] < VALIDADE_DETALHE_MS) {
+                return guardado[1];
+            }
+        }
+        Object resposta = detalharOcorrenciaNaBase(numOcorrencia);
+        if (resposta instanceof APIResponse && ((APIResponse) resposta).isStatus()) {
+            synchronized (cacheDetalhes) {
+                cacheDetalhes.put(chave, new Object[]{System.currentTimeMillis(), resposta});
+            }
+        }
+        return resposta;
+    }
+
+    private Object detalharOcorrenciaNaBase(String numOcorrencia) {
 
         if (numOcorrencia == null || numOcorrencia.isBlank()) {
             return new APIResponse.buildAPIResponse()
