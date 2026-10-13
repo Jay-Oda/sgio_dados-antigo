@@ -1,5 +1,6 @@
 package cv.pn.processmanagement.business.antecedentes;
 
+import cv.pn.processmanagement.integrations.pdf.PdfSigoAntigoService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.ResponseEntity;
@@ -18,10 +19,13 @@ public class AntecedenteController {
 
     private final IAntecedenteService iAntecedenteService;
     private final AntecedentesPessoaCache antecedentesPessoaCache;
+    private final PdfSigoAntigoService pdfSigoAntigoService;
 
-    public AntecedenteController(IAntecedenteService iAntecedenteService, AntecedentesPessoaCache antecedentesPessoaCache) {
+    public AntecedenteController(IAntecedenteService iAntecedenteService, AntecedentesPessoaCache antecedentesPessoaCache,
+                                 PdfSigoAntigoService pdfSigoAntigoService) {
         this.iAntecedenteService = iAntecedenteService;
         this.antecedentesPessoaCache = antecedentesPessoaCache;
+        this.pdfSigoAntigoService = pdfSigoAntigoService;
     }
 
     /**
@@ -132,5 +136,12 @@ public class AntecedenteController {
     public ResponseEntity<?> detalharOcorrencia(
             @Parameter(description = "Número da ocorrência (ex.: 14522/2024/EPPP)") @RequestParam String numOcorrencia) {
         return ResponseEntity.ok(iAntecedenteService.detalharOcorrencia(numOcorrencia));
+    }
+
+    /** PDF do auto da ocorrência, gerado no GeneratorPdfJasperRiporter (api.host-pdf); details[0].pdfContent em base64. */
+    @GetMapping("/ocorrencia/{nunemro}/pdf")
+    public ResponseEntity<?> pdfOcorrencia(
+            @Parameter(description = "Número da ocorrência (ex.: 14522/2024/EPPP)") @RequestParam String numOcorrencia) {
+        return ResponseEntity.ok(pdfSigoAntigoService.gerarPdfOcorrencia(numOcorrencia));
     }
 }
