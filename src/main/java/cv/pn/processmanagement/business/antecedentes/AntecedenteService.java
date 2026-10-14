@@ -44,15 +44,18 @@ public class AntecedenteService implements IAntecedenteService {
     private final SgoPecaPessoaRepository sgoPecaPessoaRepository;
     private final SigoPessoaRepository sigoPessoaRepository;
     private final OcorrenciaNacionalCache ocorrenciaNacionalCache;
+    private final IndiceAssinaturasSigoAntigo indiceAssinaturas;
 
     public AntecedenteService(SgoOcorrenciaPessoaRepository sgoOcorrenciaPessoaRepository,
                               SgoPecaPessoaRepository sgoPecaPessoaRepository,
                               SigoPessoaRepository sigoPessoaRepository,
-                              OcorrenciaNacionalCache ocorrenciaNacionalCache) {
+                              OcorrenciaNacionalCache ocorrenciaNacionalCache,
+                              IndiceAssinaturasSigoAntigo indiceAssinaturas) {
         this.sgoOcorrenciaPessoaRepository = sgoOcorrenciaPessoaRepository;
         this.sgoPecaPessoaRepository = sgoPecaPessoaRepository;
         this.sigoPessoaRepository = sigoPessoaRepository;
         this.ocorrenciaNacionalCache = ocorrenciaNacionalCache;
+        this.indiceAssinaturas = indiceAssinaturas;
     }
 
     @Override
@@ -960,6 +963,42 @@ public class AntecedenteService implements IAntecedenteService {
         return resposta;
     }
 
+    /*
+     * Com o IndiceAssinaturasSigoAntigo pronto, a assinatura e a sigo_pessoa só são lidas nos candidatos
+     * (pela chave primária) em vez de inteiras; enquanto carrega, usa-se a query original.
+     */
+    private List<PessoaEnvolvedaProjection> buscarPessoasPorOracleId(Long oracleId) {
+        if (!indiceAssinaturas.pronto()) {
+            return sgoOcorrenciaPessoaRepository.buscarPessoasPorOracleId(oracleId);
+        }
+        List<Long> pessoas = new ArrayList<>();
+        for (Number n : sgoOcorrenciaPessoaRepository.idsPessoasDaOcorrencia(oracleId)) {
+            pessoas.add(n.longValue());
+        }
+        Number agente = sgoOcorrenciaPessoaRepository.idAgenteDaOcorrencia(oracleId);
+        Long idAgente = agente == null ? null : agente.longValue();
+        return sgoOcorrenciaPessoaRepository.buscarPessoasPorOracleIdEntreCandidatos(oracleId,
+                naoVazia(indiceAssinaturas.assinaturas(pessoas, idAgente), SEM_ASSINATURA),
+                naoVazia(indiceAssinaturas.pessoasComNomeDoAgente(idAgente), SEM_PESSOA));
+    }
+
+    private AssinaturaAutuanteProjection buscarAssinaturaAutuantePorNome(String nome) {
+        if (!indiceAssinaturas.pronto()) {
+            return sgoOcorrenciaPessoaRepository.buscarAssinaturaAutuantePorNome(nome);
+        }
+        List<String> candidatas = indiceAssinaturas.assinaturasPorNome(nome);
+        return candidatas.isEmpty() ? null
+                : sgoOcorrenciaPessoaRepository.buscarAssinaturaAutuantePorNomeEntreCandidatos(nome, candidatas);
+    }
+
+    // "IN ()" não é SQL válido: uma lista vazia leva um valor que não existe
+    private static final String SEM_ASSINATURA = "-";
+    private static final Long SEM_PESSOA = -1L;
+
+    private static <T> List<T> naoVazia(List<T> lista, T valorInexistente) {
+        return lista.isEmpty() ? List.of(valorInexistente) : lista;
+    }
+
     private Object detalharOcorrenciaNaBase(String numOcorrencia) {
 
         if (numOcorrencia == null || numOcorrencia.isBlank()) {
@@ -1005,7 +1044,7 @@ public class AntecedenteService implements IAntecedenteService {
 
             List<Map<String, Object>> envolvidos = new ArrayList<>();
             List<PessoaEnvolvedaProjection> pessoasEnv = oracleId.isPresent()
-                    ? sgoOcorrenciaPessoaRepository.buscarPessoasPorOracleId(oracleId.get())
+                    ? buscarPessoasPorOracleId(oracleId.get())
                     : sgoOcorrenciaPessoaRepository.buscarPessoasPorNumOcorrencia(numOcorrencia.trim());
 
             for (PessoaEnvolvedaProjection pe : pessoasEnv) {
@@ -1050,8 +1089,7 @@ public class AntecedenteService implements IAntecedenteService {
                         || condicao.contains("Agente"));
 
                 if (ehAgenteAutuante && pm.get("assinatura") == null && pe.getNome() != null) {
-                    AssinaturaAutuanteProjection sig =
-                            sgoOcorrenciaPessoaRepository.buscarAssinaturaAutuantePorNome(pe.getNome().trim());
+                    AssinaturaAutuanteProjection sig = buscarAssinaturaAutuantePorNome(pe.getNome().trim());
                     if (sig != null && sig.getAssinatura() != null) {
                         pm.put("assinatura", sig.getAssinatura());
                         pm.put("tipoAssinante", "Autuante");

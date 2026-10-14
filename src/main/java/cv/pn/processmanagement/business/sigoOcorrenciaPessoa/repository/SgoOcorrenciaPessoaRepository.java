@@ -910,7 +910,7 @@ AND NOT EXISTS (
     WHERE o2.num_ocorrencia = :numOcorrencia
     AND UPPER(sp2.nome) = UPPER(sa.nome)
 )
-ORDER BY UPPER(COALESCE(sp.nome, sa.nome)))
+ORDER BY UPPER(COALESCE(sp.nome, sa.nome)), sp.oracle_id NULLS LAST, ag2.date_create NULLS LAST)
 ORDER BY nome
 """, nativeQuery = true)
     List<PessoaEnvolvedaProjection> buscarPessoasPorNumOcorrencia(
@@ -919,6 +919,8 @@ ORDER BY nome
     /*
      * Mesmas queries de detalharPorNumOcorrencia e buscarPessoasPorNumOcorrencia, mas filtradas pelo
      * oracle_id da ocorrência (com índice) em vez do número (sem índice): ~3 s em vez de ~27 s na base de teste.
+     * Em detalharPorOracleId, autuante/categoriaAutuante vêm a NULL: não são usados no detalhe e a junção à
+     * assinatura (sem índice em id_agente) lia a tabela inteira (~1 s).
      */
     @Query(value = """
 SELECT DISTINCT
@@ -940,8 +942,8 @@ SELECT DISTINCT
     o.motivo                  AS motivo,
     COALESCE(o.ponto_referencia, '') AS pontoReferencia,
     COALESCE(loc.nome_oficial, loc.nome, '') AS local,
-    COALESCE(sa.nome, '')     AS autuante,
-    sa.categoria              AS categoriaAutuante
+    CAST(NULL AS VARCHAR)     AS autuante,
+    CAST(NULL AS VARCHAR)     AS categoriaAutuante
 FROM sgo_ocorrencia_pessoa op
 JOIN sgo_ocorrencia o
     ON o.oracle_id = op.oracle_id_ocorrencia
@@ -957,10 +959,6 @@ LEFT JOIN esquadra com
     ON com.oracle_id = e.self_id
 LEFT JOIN glb_geografica loc
     ON loc.codigo = CAST(o.local AS VARCHAR)
-LEFT JOIN assinatura sa
-    ON sa.id_agente = o.id_agente
-    AND sa.tipo_assinante = 'AUTUANTE'
-    AND sa.nome IS NOT NULL
 WHERE o.oracle_id = :oracleId
 LIMIT 1
 """, nativeQuery = true)
@@ -1088,11 +1086,147 @@ AND NOT EXISTS (
     WHERE o2.oracle_id = :oracleId
     AND UPPER(sp2.nome) = UPPER(sa.nome)
 )
-ORDER BY UPPER(COALESCE(sp.nome, sa.nome)))
+ORDER BY UPPER(COALESCE(sp.nome, sa.nome)), sp.oracle_id NULLS LAST, ag2.date_create NULLS LAST)
 ORDER BY nome
 """, nativeQuery = true)
     List<PessoaEnvolvedaProjection> buscarPessoasPorOracleId(
             @Param("oracleId") Long oracleId);
+
+    /*
+     * Igual a buscarPessoasPorOracleId, mas a assinatura e a sigo_pessoa (sem índice em id_pessoa, id_agente e nome)
+     * só são lidas nos candidatos indicados pelo IndiceAssinaturasSigoAntigo, pela chave primária. As outras
+     * condições não mudam, por isso o resultado é o mesmo; passa de 5-11 s para menos de 1 s na base de teste.
+     */
+    @Query(value = """
+(SELECT DISTINCT ON (p.oracle_id, op.condicao)
+    p.oracle_id     AS oracleId,
+    p.nome          AS nome,
+    p.alcunhas      AS alcunhas,
+    p.pai           AS pai,
+    p.mae           AS mae,
+    CASE
+        WHEN o.tp_auto = '1' AND op.condicao = '1' THEN 'Denunciante'
+        WHEN o.tp_auto = '1' AND op.condicao = '2' THEN 'Ofendido'
+        WHEN o.tp_auto = '1' AND op.condicao = '3' THEN 'Denunciado'
+        WHEN o.tp_auto = '1' AND op.condicao = '4' THEN 'Testemunha'
+        WHEN o.tp_auto = '2' AND op.condicao = '1' THEN 'Participante'
+        WHEN o.tp_auto = '2' AND op.condicao = '2' THEN 'Denunciante'
+        WHEN o.tp_auto = '2' AND op.condicao = '3' THEN 'Denunciado'
+        WHEN o.tp_auto = '2' AND op.condicao = '4' THEN 'Testemunha'
+        WHEN o.tp_auto = '2' AND op.condicao = '5' THEN 'Detentor'
+        WHEN o.tp_auto = '2' AND op.condicao = '6' THEN 'Detentor'
+        WHEN o.tp_auto = '2' AND op.condicao = '8' THEN 'Agente Atuante'
+        WHEN o.tp_auto = '3' AND op.condicao = '2' THEN 'Ofendido'
+        WHEN o.tp_auto = '3' AND op.condicao = '4' THEN 'Testemunha'
+        WHEN o.tp_auto = '3' AND op.condicao IN ('3','5') THEN 'Detido'
+        WHEN o.tp_auto = '3' AND op.condicao = '6' THEN 'Detentor'
+        WHEN o.tp_auto = '4' AND op.condicao = '1' THEN 'Denunciante/Vitima'
+        WHEN o.tp_auto = '4' AND op.condicao = '2' THEN 'Ofendido'
+        WHEN o.tp_auto = '4' AND op.condicao = '3' THEN 'Denunciado/Autor'
+        WHEN o.tp_auto = '4' AND op.condicao = '4' THEN 'Testemunha'
+        WHEN o.tp_auto = '5' AND op.condicao = '2' THEN 'Identificado'
+        WHEN o.tp_auto = '5' AND op.condicao = '3' THEN 'Detido'
+        WHEN o.tp_auto = '5' AND op.condicao = '4' THEN 'Testemunha'
+        WHEN o.tp_auto = '5' AND op.condicao = '5' THEN 'Detido'
+        WHEN o.tp_auto = '5' AND op.condicao = '6' THEN 'Detentor'
+        WHEN o.tp_auto = '5' AND op.condicao = '7' THEN 'Agente Identificador'
+        WHEN o.tp_auto = '5' AND op.condicao = '8' THEN 'Agente Atuante'
+        ELSE 'Desconhecido'
+    END             AS condicao,
+    p.dt_nascimento AS dtNascimento,
+    p.idade         AS idade,
+    p.estado_civil  AS estadoCivil,
+    p.contacto      AS contacto,
+    p.morada        AS morada,
+    p.nacionalidade AS nacionalidade,
+    p.naturalidade  AS naturalidade,
+    p.profissao     AS profissao,
+    ag.categoria    AS categoriaEfetivo,
+    COALESCE(ge.nome, '') AS esquadraEfetivo,
+    CASE
+        WHEN asse.tipo_assinante IS NOT NULL THEN REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+            asse.tipo_assinante,
+            '&lt;', '<'), '&gt;', '>'), '&amp;', '&'), '&quot;', '"'), '&#39;', ''''), '&nbsp;', ' ')
+        ELSE NULL
+    END             AS tipoAssinante,
+    asse.categoria  AS categoriaAssinatura,
+    asse.assina     AS assina,
+    asse.sabe_assinar AS sabeAssinar,
+    asse.assinatura AS assinatura
+FROM sgo_ocorrencia_pessoa op
+JOIN sgo_ocorrencia o
+    ON o.oracle_id = op.oracle_id_ocorrencia
+LEFT JOIN sigo_pessoa p
+    ON p.oracle_id = op.oracle_id_pessoa
+LEFT JOIN LATERAL (
+    SELECT a1.tipo_assinante, a1.categoria, a1.assina, a1.sabe_assinar, a1.assinatura, a1.date_create
+    FROM assinatura a1
+    WHERE a1.id IN (:assinaturas) AND a1.id_pessoa = p.oracle_id AND a1.nome IS NOT NULL
+    ORDER BY a1.date_create DESC
+    LIMIT 1
+) asse ON true
+LEFT JOIN agente ag
+    ON ag.nome = p.nome
+LEFT JOIN esquadra ge
+    ON ge.oracle_id = ag.id_esquadra
+WHERE o.oracle_id = :oracleId
+ORDER BY p.oracle_id, op.condicao, asse.date_create DESC)
+UNION ALL
+(SELECT DISTINCT ON (UPPER(COALESCE(sp.nome, sa.nome)))
+    COALESCE(sp.oracle_id, 0) AS oracleId,
+    COALESCE(sp.nome, sa.nome) AS nome,
+    sp.alcunhas        AS alcunhas,
+    sp.pai             AS pai,
+    sp.mae             AS mae,
+    'Autuante'         AS condicao,
+    sp.dt_nascimento   AS dtNascimento,
+    sp.idade           AS idade,
+    sp.estado_civil    AS estadoCivil,
+    sp.contacto        AS contacto,
+    sp.morada          AS morada,
+    sp.nacionalidade   AS nacionalidade,
+    sp.naturalidade    AS naturalidade,
+    sp.profissao       AS profissao,
+    ag2.categoria      AS categoriaEfetivo,
+    COALESCE(ge2.nome, '') AS esquadraEfetivo,
+    'Autuante'         AS tipoAssinante,
+    sa.categoria       AS categoriaAssinatura,
+    sa.assina          AS assina,
+    sa.sabe_assinar    AS sabeAssinar,
+    sa.assinatura      AS assinatura
+FROM sgo_ocorrencia o
+JOIN LATERAL (
+    SELECT a2.id_agente, a2.nome, a2.categoria, a2.assina, a2.sabe_assinar, a2.assinatura, a2.date_create
+    FROM assinatura a2
+    WHERE a2.id IN (:assinaturas)
+      AND a2.id_agente = o.id_agente
+      AND a2.tipo_assinante = 'AUTUANTE'
+      AND a2.nome IS NOT NULL
+    ORDER BY a2.date_create DESC
+    LIMIT 1
+) sa ON true
+LEFT JOIN sigo_pessoa sp
+    ON sp.oracle_id IN (:pessoasAutuante)
+    AND UPPER(sp.nome) = UPPER(sa.nome)
+LEFT JOIN agente ag2
+    ON UPPER(ag2.nome) = UPPER(sa.nome)
+LEFT JOIN esquadra ge2
+    ON ge2.oracle_id = ag2.id_esquadra
+WHERE o.oracle_id = :oracleId
+AND NOT EXISTS (
+    SELECT 1 FROM sgo_ocorrencia_pessoa op2
+    JOIN sgo_ocorrencia o2 ON o2.oracle_id = op2.oracle_id_ocorrencia
+    LEFT JOIN sigo_pessoa sp2 ON sp2.oracle_id = op2.oracle_id_pessoa
+    WHERE o2.oracle_id = :oracleId
+    AND UPPER(sp2.nome) = UPPER(sa.nome)
+)
+ORDER BY UPPER(COALESCE(sp.nome, sa.nome)), sp.oracle_id NULLS LAST, ag2.date_create NULLS LAST)
+ORDER BY nome
+""", nativeQuery = true)
+    List<PessoaEnvolvedaProjection> buscarPessoasPorOracleIdEntreCandidatos(
+            @Param("oracleId") Long oracleId,
+            @Param("assinaturas") List<String> assinaturas,
+            @Param("pessoasAutuante") List<Long> pessoasAutuante);
 
     @Query(value = """
 SELECT a.categoria AS categoria, a.assinatura AS assinatura
@@ -1104,6 +1238,33 @@ ORDER BY a.date_create DESC
 LIMIT 1
 """, nativeQuery = true)
     AssinaturaAutuanteProjection buscarAssinaturaAutuantePorNome(@Param("nome") String nome);
+
+    /** Igual a buscarAssinaturaAutuantePorNome, só entre as assinaturas candidatas (lidas pela chave primária). */
+    @Query(value = """
+SELECT a.categoria AS categoria, a.assinatura AS assinatura
+FROM assinatura a
+WHERE a.id IN (:assinaturas)
+  AND UPPER(TRIM(a.nome)) = UPPER(TRIM(:nome))
+  AND UPPER(a.tipo_assinante) = 'AUTUANTE'
+  AND a.assinatura IS NOT NULL
+ORDER BY a.date_create DESC
+LIMIT 1
+""", nativeQuery = true)
+    AssinaturaAutuanteProjection buscarAssinaturaAutuantePorNomeEntreCandidatos(
+            @Param("nome") String nome,
+            @Param("assinaturas") List<String> assinaturas);
+
+    /** Pessoas envolvidas na ocorrência (sgo_ocorrencia_pessoa tem índice em oracle_id_ocorrencia). */
+    @Query(value = """
+SELECT DISTINCT op.oracle_id_pessoa
+FROM sgo_ocorrencia_pessoa op
+WHERE op.oracle_id_ocorrencia = :oracleId
+  AND op.oracle_id_pessoa IS NOT NULL
+""", nativeQuery = true)
+    List<Number> idsPessoasDaOcorrencia(@Param("oracleId") Long oracleId);
+
+    @Query(value = "SELECT o.id_agente FROM sgo_ocorrencia o WHERE o.oracle_id = :oracleId LIMIT 1", nativeQuery = true)
+    Number idAgenteDaOcorrencia(@Param("oracleId") Long oracleId);
 
     @Query(value = """
 SELECT
