@@ -22,6 +22,7 @@ public interface IOcorrenciaNacionalService {
             Long unidade,
             String comandoSigla,
             String unidadeSigla,
+            String interveniente,
             Integer offset);
 
     Map<String, Object> obterOpcoes();

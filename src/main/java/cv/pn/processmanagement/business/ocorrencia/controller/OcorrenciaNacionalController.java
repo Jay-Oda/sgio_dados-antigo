@@ -42,12 +42,15 @@ public class OcorrenciaNacionalController {
             @RequestParam(required = false) Long unidade,
             @RequestParam(required = false) String comandoSigla,
             @RequestParam(required = false) String unidadeSigla,
+            // "Nome / Alcunha do Interveniente": como no SIGOIC, ocorrências com algum interveniente cujo nome
+            // ou alcunha contenha este texto (sem acentos nem maiúsculas)
+            @RequestParam(required = false) String interveniente,
             @RequestParam(required = false) Integer offset) {
 
         return ResponseEntity.ok(ocorrenciaNacionalService.listarOcorrencias(
                 page, size, numOcorrencia, tpAuto, estado, dataInicio, dataFim,
                 natureza, tipologia, tipologiaSemelhante, enquadramento, comando, unidade,
-                comandoSigla, unidadeSigla, offset));
+                comandoSigla, unidadeSigla, interveniente, offset));
     }
 
     @GetMapping("/Ocorrencia/opcoes")

@@ -16,6 +16,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -99,6 +100,15 @@ public class OcorrenciaNacionalCache {
             FROM processo pr
             WHERE pr.prazo IS NOT NULL AND pr.prazo <> ''
             """;
+
+    // Nome e alcunha de cada interveniente (pessoa) das ocorrências, para a pesquisa "Nome / Alcunha do Interveniente"
+    private static final String SQL_INTERVENIENTES = """
+            SELECT op.oracle_id_ocorrencia, p.nome, p.alcunhas
+            FROM sgo_ocorrencia_pessoa op
+            JOIN sigo_pessoa p ON p.oracle_id = op.oracle_id_pessoa
+            """;
+    // Separa os nomes guardados de cada ocorrência; não aparece no texto pesquisado (ver normalizarInterveniente)
+    private static final char SEPARADOR_NOMES = '\n';
 
     private final JdbcTemplate jdbcTemplate;
     private final ScheduledExecutorService agendador = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -213,9 +223,23 @@ public class OcorrenciaNacionalCache {
             }
         });
 
+        Map<Long, StringBuilder> intervenientes = new HashMap<>();
+        CargaSigoAntigo.consultarEmBlocos(jdbcTemplate, SQL_INTERVENIENTES, rs -> {
+            StringBuilder nomes = intervenientes.computeIfAbsent(rs.getLong("oracle_id_ocorrencia"), k -> new StringBuilder());
+            for (String nome : new String[]{rs.getString("nome"), rs.getString("alcunhas")}) {
+                String n = normalizarInterveniente(nome);
+                if (!n.isEmpty()) {
+                    nomes.append(n).append(SEPARADOR_NOMES);
+                }
+            }
+        });
+
         List<Entrada> lista = new ArrayList<>(110_000);
         CargaSigoAntigo.consultarEmBlocos(jdbcTemplate, SQL_OCORRENCIAS, rs -> {
-            lista.add(criarEntrada(rs, tipos, autuantes, processosPorId, processosPorNumero));
+            Entrada e = criarEntrada(rs, tipos, autuantes, processosPorId, processosPorNumero);
+            StringBuilder nomes = intervenientes.get(e.oracleId);
+            e.intervenientes = nomes == null ? "" : nomes.toString();
+            lista.add(e);
         });
 
         lista.sort(ORDEM_LISTAGEM);
@@ -281,7 +305,7 @@ public class OcorrenciaNacionalCache {
     public Optional<Resultado> pesquisar(String numFiltro, String tpAuto, String estados, String dataInicio, String dataFim,
                                          String natureza, String tipologia, Set<String> tipologiasAceites,
                                          String enquadramento, Long comando, Long unidade, String comandoSigla, String unidadeSigla,
-                                         int offset, int tamanho) {
+                                         String interveniente, int offset, int tamanho) {
         List<Entrada> todas = entradas;
         if (todas == null) {
             return Optional.empty();
@@ -303,6 +327,10 @@ public class OcorrenciaNacionalCache {
         }
 
         String numero = numFiltro == null ? null : numFiltro.toLowerCase(Locale.ROOT);
+        String nomeInterveniente = interveniente == null ? null : normalizarInterveniente(interveniente);
+        if (nomeInterveniente != null && nomeInterveniente.isEmpty()) {
+            nomeInterveniente = null;
+        }
         Set<String> codigosEstado = estados == null ? null : new HashSet<>(Arrays.asList(estados.split(",")));
 
         List<OcorrenciaNacionalDto> encontradas = new ArrayList<>();
@@ -321,6 +349,7 @@ public class OcorrenciaNacionalCache {
             if (unidade != null && !unidade.equals(e.unidadeId) && !unidade.equals(e.idComando)) continue;
             if (comandoSigla != null && !comandoSigla.equals(e.comandoSigla)) continue;
             if (unidadeSigla != null && !unidadeSigla.equals(e.unidadeSigla)) continue;
+            if (nomeInterveniente != null && !e.intervenientes.contains(nomeInterveniente)) continue;
 
             if (total >= offset && encontradas.size() < tamanho) {
                 encontradas.add(e.dto);
@@ -524,7 +553,19 @@ public class OcorrenciaNacionalCache {
         Set<String> naturezasFiltro = Collections.emptySet();
         Set<String> tipologiasFiltro = Collections.emptySet();
         Set<String> enquadramentosFiltro = Collections.emptySet();
+        // Nomes e alcunhas dos intervenientes, normalizados e separados por SEPARADOR_NOMES
+        String intervenientes = "";
         OcorrenciaNacionalDto dto;
+    }
+
+    /**
+     * Igual ao SIGOIC (APIUtilities.replaceSpecialCharacters + lower/unaccent na query): sem acentos nem outros
+     * caracteres fora do ASCII e em minúsculas. A pesquisa é "contém", no nome ou na alcunha.
+     */
+    public static String normalizarInterveniente(String texto) {
+        if (texto == null) return "";
+        String semAcentos = Normalizer.normalize(texto, Normalizer.Form.NFD).replaceAll("[^\\p{ASCII}]", "");
+        return semAcentos.replace(SEPARADOR_NOMES, ' ').toLowerCase(Locale.ROOT);
     }
 
     private static final class Tipos {

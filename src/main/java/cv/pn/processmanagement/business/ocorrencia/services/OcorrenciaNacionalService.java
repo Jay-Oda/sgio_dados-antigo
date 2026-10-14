@@ -79,6 +79,7 @@ public class OcorrenciaNacionalService implements IOcorrenciaNacionalService {
                                          Long unidade,
                                          String comandoSigla,
                                          String unidadeSigla,
+                                         String interveniente,
                                          Integer offset) {
 
         try {
@@ -119,7 +120,7 @@ public class OcorrenciaNacionalService implements IOcorrenciaNacionalService {
             Optional<OcorrenciaNacionalCache.Resultado> daCache = ocorrenciaNacionalCache.pesquisar(
                     numFiltro == null ? null : numOcorrencia.trim(), tpAuto, estadoFiltro, dataInicioSql, dataFimSql,
                     natureza, tipologia, tipologiasAceites, enquadramento, comando, unidade,
-                    comandoSiglaFiltro, unidadeSiglaFiltro, deslocamento, tamanho);
+                    comandoSiglaFiltro, unidadeSiglaFiltro, textoOuNulo(interveniente), deslocamento, tamanho);
             if (daCache.isPresent()) {
                 long totalCache = daCache.get().getTotal();
                 return new APIResponse.buildAPIResponse()
@@ -127,6 +128,15 @@ public class OcorrenciaNacionalService implements IOcorrenciaNacionalService {
                         .setStatusText("Ocorrências encontradas com sucesso")
                         .setDetails(new ArrayList<>(daCache.get().getRegistos()))
                         .setPagination(new Pagination(pagina, tamanho, (int) Math.ceil((double) totalCache / tamanho), totalCache))
+                        .builder();
+            }
+
+            // A pesquisa por interveniente só existe na cache (a query SQL não lê as pessoas)
+            if (textoOuNulo(interveniente) != null) {
+                return new APIResponse.buildAPIResponse()
+                        .setStatus(false)
+                        .setStatusText("Os dados do SIGO antigo ainda estão a carregar")
+                        .setDetails(Collections.emptyList())
                         .builder();
             }
 
