@@ -33,7 +33,7 @@ public class AntecedenteController {
             @Parameter(description = "Nome da pessoa") @RequestParam String nome,
             @Parameter(description = "Nome do pai") @RequestParam(required = false) String pai,
             @Parameter(description = "Nome da mãe") @RequestParam(required = false) String mae,
-            @Parameter(description = "Data de nascimento (ex.: 2002-01-22); se as duas existirem, têm de ser iguais")
+            @Parameter(description = "Data de nascimento (ex.: 2002-01-22); não conta na comparação")
             @RequestParam(required = false) String dataNascimento) {
         return ResponseEntity.ok(antecedentesPessoaCache.pesquisar(nome, pai, mae, dataNascimento));
     }

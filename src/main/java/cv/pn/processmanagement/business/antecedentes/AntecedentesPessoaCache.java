@@ -11,13 +11,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PreDestroy;
-import java.sql.Date;
 import java.sql.Timestamp;
 import java.text.Normalizer;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -41,13 +38,15 @@ import java.util.concurrent.TimeUnit;
  * Os nomes vindos do SIGOIC/RNI e os do SIGO antigo nem sempre estão escritos da mesma forma
  * (maiúsculas, acentos, espaços repetidos e até a ordem dos apelidos: "Lúcio Alexandre Tavares Da Cruz
  * De Pina" no RNI e "LUCIO ALEXANDRE TAVARES  DE PINA DA CRUZ" no SIGO antigo). Por isso cada nome é
- * reduzido ao conjunto das suas palavras (sem acentos, em maiúsculas, sem partículas de/da/do/das/dos/e)
- * e a pessoa só é considerada a mesma quando o nome, o nome do pai e o nome da mãe coincidem.
- * Se as duas datas de nascimento existirem, também têm de ser iguais.
+ * reduzido às suas palavras (sem acentos, em maiúsculas, sem partículas de/da/do/das/dos/e), e dois nomes
+ * "coincidem" quando têm as mesmas palavras ou são pelo menos 80% iguais (pela ordem escrita ou pelas
+ * palavras ordenadas), o que aceita erros de digitação ("Ivam"/"YVAM", "Sunday"/"Suwday").
  *
- * Erros de digitação no nome da pessoa ("Ivam" no RNI, "YVAM" no SIGO antigo): quando o pai e a mãe
- * coincidem e a data de nascimento existe nos dois lados e é igual, basta o nome ser pelo menos 80% igual.
- * Sem data de nascimento, o nome tem de ter as mesmas palavras.
+ * Regra definida pelo utilizador em 2026-10-14: é a mesma pessoa quando o nome coincide e
+ * - no SIGO antigo não há pai nem mãe registados; ou
+ * - só há um deles registado e esse coincide com o do RNI; ou
+ * - há os dois registados e pelo menos um coincide.
+ * A data de nascimento não conta.
  *
  * Contam como antecedentes as mesmas condições do endpoint busca/antecidente: Denunciado (Auto de
  * Denúncia), Detido (Auto de Detenção, condição 5) e Denunciado/Autor (Auto de Denúncia VBG).
@@ -62,14 +61,8 @@ public class AntecedentesPessoaCache {
     private static final Set<String> PARTICULAS = Set.of("DE", "DA", "DO", "DAS", "DOS", "E", "D");
     private static final String SEM_ANTECEDENTES = "Antecedente(s) SIGO\nAviso!\nNão foi encontrado nenhum registo(s) de antecedente(s).";
 
-    private static final List<DateTimeFormatter> FORMATOS_DATA_NASCIMENTO = List.of(
-            DateTimeFormatter.ofPattern("yyyy-MM-dd"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd"));
-
     private static final String SQL_ANTECEDENTES = """
-            SELECT p.oracle_id AS pessoa_id, p.nome, p.pai, p.mae, p.dt_nascimento,
+            SELECT p.oracle_id AS pessoa_id, p.nome, p.pai, p.mae,
                    o.num_ocorrencia, o.data_registo, o.tp_auto, op.condicao,
                    COALESCE(tp_pai.nome, tp.nome, '') AS natureza,
                    COALESCE(tp.nome, '') AS tipologia,
@@ -96,8 +89,8 @@ public class AntecedentesPessoaCache {
 
     /** Chave = palavras do nome da pessoa; valor = pessoas do SIGO antigo com esse nome. */
     private volatile Map<String, List<Pessoa>> pessoasPorNome;
-    /** Chave = pai + mãe + data de nascimento; usado para aceitar erros de digitação no nome da pessoa. */
-    private volatile Map<String, List<Pessoa>> pessoasPorPaisENascimento;
+    /** Todas as pessoas, para comparar nomes com erros de digitação (pelo menos 80% iguais). */
+    private volatile List<Pessoa> todasPessoas;
     private volatile int totalPessoas;
     private volatile java.util.Date carregadoEm;
     private volatile long duracaoUltimaCargaMs;
@@ -153,8 +146,6 @@ public class AntecedentesPessoaCache {
                     p.chaveMae = chave(rs.getString("mae"));
                     p.paiPorOrdem = nomePorOrdem(rs.getString("pai"));
                     p.maePorOrdem = nomePorOrdem(rs.getString("mae"));
-                    Date nasc = rs.getDate("dt_nascimento");
-                    p.dataNascimento = nasc == null ? null : nasc.toLocalDate();
                     porId.put(id, p);
                 }
                 Linha l = new Linha();
@@ -170,18 +161,15 @@ public class AntecedentesPessoaCache {
             });
 
             Map<String, List<Pessoa>> indice = new HashMap<>();
-            Map<String, List<Pessoa>> indicePaisENascimento = new HashMap<>();
+            List<Pessoa> todas = new ArrayList<>();
             for (Pessoa p : porId.values()) {
                 if (!p.chaveNome.isEmpty()) {
                     indice.computeIfAbsent(p.chaveNome, k -> new ArrayList<>()).add(p);
-                }
-                if (!p.chavePai.isEmpty() && !p.chaveMae.isEmpty() && p.dataNascimento != null) {
-                    indicePaisENascimento.computeIfAbsent(chavePaisENascimento(p.chavePai, p.chaveMae, p.dataNascimento),
-                            k -> new ArrayList<>()).add(p);
+                    todas.add(p);
                 }
             }
 
-            pessoasPorPaisENascimento = indicePaisENascimento;
+            todasPessoas = todas;
             pessoasPorNome = indice;
             totalPessoas = porId.size();
             carregadoEm = new java.util.Date();
@@ -196,6 +184,7 @@ public class AntecedentesPessoaCache {
         }
     }
 
+    /** A data de nascimento continua a ser recebida (a interface envia-a), mas não conta desde 2026-10-14. */
     public APIResponse pesquisar(String nome, String pai, String mae, String dataNascimento) {
         Map<String, List<Pessoa>> indice = pessoasPorNome;
         if (indice == null) {
@@ -208,29 +197,16 @@ public class AntecedentesPessoaCache {
         if (chaveNome.isEmpty() || chavePai.isEmpty() || chaveMae.isEmpty()) {
             return resposta(false, "Para confirmar a pessoa no SIGO antigo são necessários o nome, o nome do pai e o nome da mãe.", null);
         }
-        LocalDate nascimento = lerData(dataNascimento);
-
         // Junta os antecedentes de todas as pessoas que coincidem, agrupados por ocorrência (como busca/antecidente)
         Map<String, Map<String, Object>> porOcorrencia = new LinkedHashMap<>();
         Set<Pessoa> encontradas = new LinkedHashSet<>();
-        // Nome igual: pai e mãe iguais ou, desde 2026-10-14, pelo menos 80% iguais (ex.: "Suwday"/"Sunday"), mesmo
-        // sem data de nascimento; se a data existir nos dois lados, tem de ser igual
+        String nomeRecebido = nomePorOrdem(nome);
         String paiPorOrdem = nomePorOrdem(pai);
         String maePorOrdem = nomePorOrdem(mae);
-        for (Pessoa p : indice.getOrDefault(chaveNome, Collections.emptyList())) {
-            if (!semelhante(paiPorOrdem, chavePai, p.paiPorOrdem, p.chavePai)
-                    || !semelhante(maePorOrdem, chaveMae, p.maePorOrdem, p.chaveMae)) continue;
-            if (nascimento != null && p.dataNascimento != null && !nascimento.equals(p.dataNascimento)) continue;
-            encontradas.add(p);
-        }
-        // Pai, mãe e data de nascimento iguais: aceita erros de digitação no nome (pelo menos 80% igual)
-        if (nascimento != null && pessoasPorPaisENascimento != null) {
-            String nomeRecebido = nomePorOrdem(nome);
-            for (Pessoa p : pessoasPorPaisENascimento.getOrDefault(
-                    chavePaisENascimento(chavePai, chaveMae, nascimento), Collections.emptyList())) {
-                if (nomesSemelhantes(nomeRecebido, chaveNome, p)) {
-                    encontradas.add(p);
-                }
+        for (Pessoa p : todasPessoas) {
+            if (!p.chaveNome.equals(chaveNome) && !nomesSemelhantes(nomeRecebido, chaveNome, p)) continue;
+            if (paisCoincidem(paiPorOrdem, chavePai, maePorOrdem, chaveMae, p)) {
+                encontradas.add(p);
             }
         }
         List<Linha> linhas = new ArrayList<>();
@@ -287,6 +263,11 @@ public class AntecedentesPessoaCache {
 
     /** Nome pelo menos 80% igual, comparando pela ordem escrita ou pelas palavras ordenadas (apelidos trocados). */
     private static boolean nomesSemelhantes(String nomeRecebidoPorOrdem, String chaveNomeRecebido, Pessoa p) {
+        // Com comprimentos muito diferentes nunca chega a 80%: evita comparar letra a letra com todas as pessoas
+        int maior = Math.max(nomeRecebidoPorOrdem.length(), p.nomePorOrdem.length());
+        if (Math.abs(nomeRecebidoPorOrdem.length() - p.nomePorOrdem.length()) > maior * (1 - SemelhancaTexto.SEMELHANCA_MINIMA)) {
+            return false;
+        }
         return SemelhancaTexto.semelhanca(nomeRecebidoPorOrdem, p.nomePorOrdem) >= SemelhancaTexto.SEMELHANCA_MINIMA
                 || SemelhancaTexto.semelhanca(chaveNomeRecebido, p.chaveNome) >= SemelhancaTexto.SEMELHANCA_MINIMA;
     }
@@ -299,22 +280,16 @@ public class AntecedentesPessoaCache {
                 || SemelhancaTexto.semelhanca(chaveRecebida, chaveSigo) >= SemelhancaTexto.SEMELHANCA_MINIMA;
     }
 
-    private static String chavePaisENascimento(String chavePai, String chaveMae, LocalDate nascimento) {
-        return chavePai + "|" + chaveMae + "|" + nascimento;
-    }
-
-    private static LocalDate lerData(String valor) {
-        if (valor == null || valor.trim().isEmpty()) return null;
-        String v = valor.trim();
-        if (v.length() > 10 && v.charAt(4) == '-') v = v.substring(0, 10); // ex.: 2002-01-22T00:00:00
-        for (DateTimeFormatter f : FORMATOS_DATA_NASCIMENTO) {
-            try {
-                return LocalDate.parse(v, f);
-            } catch (Exception ignored) {
-                // tenta o formato seguinte
-            }
-        }
-        return null;
+    /**
+     * Pais do RNI comparados com os do SIGO antigo: sem nenhum registado no SIGO antigo, aceita; só com um,
+     * esse tem de coincidir; com os dois, basta um coincidir.
+     */
+    private static boolean paisCoincidem(String paiPorOrdem, String chavePai, String maePorOrdem, String chaveMae, Pessoa p) {
+        boolean temPai = p.chavePai != null && !p.chavePai.isEmpty();
+        boolean temMae = p.chaveMae != null && !p.chaveMae.isEmpty();
+        if (!temPai && !temMae) return true;
+        return (temPai && semelhante(paiPorOrdem, chavePai, p.paiPorOrdem, p.chavePai))
+                || (temMae && semelhante(maePorOrdem, chaveMae, p.maePorOrdem, p.chaveMae));
     }
 
     @SuppressWarnings("unchecked")
@@ -359,7 +334,6 @@ public class AntecedentesPessoaCache {
         String chaveMae;
         String paiPorOrdem;
         String maePorOrdem;
-        LocalDate dataNascimento;
         final List<Linha> linhas = new ArrayList<>();
     }
 
