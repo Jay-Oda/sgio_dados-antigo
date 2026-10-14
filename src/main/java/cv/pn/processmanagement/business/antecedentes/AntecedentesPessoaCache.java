@@ -151,6 +151,8 @@ public class AntecedentesPessoaCache {
                     p.nomePorOrdem = nomePorOrdem(rs.getString("nome"));
                     p.chavePai = chave(rs.getString("pai"));
                     p.chaveMae = chave(rs.getString("mae"));
+                    p.paiPorOrdem = nomePorOrdem(rs.getString("pai"));
+                    p.maePorOrdem = nomePorOrdem(rs.getString("mae"));
                     Date nasc = rs.getDate("dt_nascimento");
                     p.dataNascimento = nasc == null ? null : nasc.toLocalDate();
                     porId.put(id, p);
@@ -211,8 +213,13 @@ public class AntecedentesPessoaCache {
         // Junta os antecedentes de todas as pessoas que coincidem, agrupados por ocorrência (como busca/antecidente)
         Map<String, Map<String, Object>> porOcorrencia = new LinkedHashMap<>();
         Set<Pessoa> encontradas = new LinkedHashSet<>();
+        // Nome igual: pai e mãe iguais ou, desde 2026-10-14, pelo menos 80% iguais (ex.: "Suwday"/"Sunday"), mesmo
+        // sem data de nascimento; se a data existir nos dois lados, tem de ser igual
+        String paiPorOrdem = nomePorOrdem(pai);
+        String maePorOrdem = nomePorOrdem(mae);
         for (Pessoa p : indice.getOrDefault(chaveNome, Collections.emptyList())) {
-            if (!chavePai.equals(p.chavePai) || !chaveMae.equals(p.chaveMae)) continue;
+            if (!semelhante(paiPorOrdem, chavePai, p.paiPorOrdem, p.chavePai)
+                    || !semelhante(maePorOrdem, chaveMae, p.maePorOrdem, p.chaveMae)) continue;
             if (nascimento != null && p.dataNascimento != null && !nascimento.equals(p.dataNascimento)) continue;
             encontradas.add(p);
         }
@@ -284,6 +291,14 @@ public class AntecedentesPessoaCache {
                 || SemelhancaTexto.semelhanca(chaveNomeRecebido, p.chaveNome) >= SemelhancaTexto.SEMELHANCA_MINIMA;
     }
 
+    /** Pai ou mãe: igual (mesmas palavras) ou pelo menos 80% igual, pela ordem escrita ou pelas palavras ordenadas. */
+    private static boolean semelhante(String recebidoPorOrdem, String chaveRecebida, String sigoPorOrdem, String chaveSigo) {
+        if (chaveSigo == null || chaveSigo.isEmpty()) return false;
+        if (chaveRecebida.equals(chaveSigo)) return true;
+        return SemelhancaTexto.semelhanca(recebidoPorOrdem, sigoPorOrdem) >= SemelhancaTexto.SEMELHANCA_MINIMA
+                || SemelhancaTexto.semelhanca(chaveRecebida, chaveSigo) >= SemelhancaTexto.SEMELHANCA_MINIMA;
+    }
+
     private static String chavePaisENascimento(String chavePai, String chaveMae, LocalDate nascimento) {
         return chavePai + "|" + chaveMae + "|" + nascimento;
     }
@@ -342,6 +357,8 @@ public class AntecedentesPessoaCache {
         String nomePorOrdem;
         String chavePai;
         String chaveMae;
+        String paiPorOrdem;
+        String maePorOrdem;
         LocalDate dataNascimento;
         final List<Linha> linhas = new ArrayList<>();
     }
