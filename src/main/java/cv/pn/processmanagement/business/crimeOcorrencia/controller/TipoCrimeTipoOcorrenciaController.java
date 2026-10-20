@@ -1,27 +1,32 @@
-package cv.pn.processmanagement.business.crimeOcorrencia.controller;
+// ===========================================================================
+// CONTROLADOR COMENTADO A PEDIDO (2026-10-20): fora do Swagger
+// de "Sigo dados - antigo". Para reativar, remover o prefixo "// "
+// do inicio de cada linha (o bloco comeca na linha seguinte a esta nota).
+// ===========================================================================
+// package cv.pn.processmanagement.business.crimeOcorrencia.controller;
 
 
-import cv.pn.processmanagement.business.crimeOcorrencia.dto.TipoCrimeTipoOcorrenciaDto;
-import cv.pn.processmanagement.business.crimeOcorrencia.services.ITipoCrimeTipoOcorrenciaService;
-import cv.pn.processmanagement.utilities.APIResponse;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+// import cv.pn.processmanagement.business.crimeOcorrencia.dto.TipoCrimeTipoOcorrenciaDto;
+// import cv.pn.processmanagement.business.crimeOcorrencia.services.ITipoCrimeTipoOcorrenciaService;
+// import cv.pn.processmanagement.utilities.APIResponse;
+// import org.springframework.http.ResponseEntity;
+// import org.springframework.web.bind.annotation.PostMapping;
+// import org.springframework.web.bind.annotation.RequestBody;
+// import org.springframework.web.bind.annotation.RequestMapping;
+// import org.springframework.web.bind.annotation.RestController;
 
-@RestController
-@RequestMapping("/api/tipocrime-tipocorrencia")
-public class TipoCrimeTipoOcorrenciaController {
+// @RestController
+// @RequestMapping("/api/tipocrime-tipocorrencia")
+// public class TipoCrimeTipoOcorrenciaController {
 
-    private final ITipoCrimeTipoOcorrenciaService iTipoCrimeTipoOcorrenciaService;
+//     private final ITipoCrimeTipoOcorrenciaService iTipoCrimeTipoOcorrenciaService;
 
-    public TipoCrimeTipoOcorrenciaController(ITipoCrimeTipoOcorrenciaService iTipoCrimeTipoOcorrenciaService) {
-        this.iTipoCrimeTipoOcorrenciaService = iTipoCrimeTipoOcorrenciaService;
-    }
+//     public TipoCrimeTipoOcorrenciaController(ITipoCrimeTipoOcorrenciaService iTipoCrimeTipoOcorrenciaService) {
+//         this.iTipoCrimeTipoOcorrenciaService = iTipoCrimeTipoOcorrenciaService;
+//     }
 
-    @PostMapping
-    public ResponseEntity<APIResponse> create(@RequestBody TipoCrimeTipoOcorrenciaDto dto) {
-        return ResponseEntity.ok(iTipoCrimeTipoOcorrenciaService.createTipoCrime(dto));
-    }
-}
+//     @PostMapping
+//     public ResponseEntity<APIResponse> create(@RequestBody TipoCrimeTipoOcorrenciaDto dto) {
+//         return ResponseEntity.ok(iTipoCrimeTipoOcorrenciaService.createTipoCrime(dto));
+//     }
+// }

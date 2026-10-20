@@ -7,8 +7,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-@OpenAPIDefinition(info = @Info(title = "Microservice Name",
-		description = "Description of Micro Services",
+@OpenAPIDefinition(info = @Info(title = "Sigo dados - antigo",
+		description = "Sigo dados - antigo (API v1) - antecedentes, ocorrencias e cadastros do SIGO antigo.",
 		version = "v1",
 		contact = @Contact(name = "Policia Nacional",
 				email = "ady@gov.cv",

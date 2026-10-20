@@ -6,7 +6,6 @@ import cv.pn.processmanagement.utilities.APIResponse;
 import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -72,9 +71,8 @@ public class OcorrenciaNacionalController {
      * PDF do auto (Auto(s) Registado(s) na página de detalhes), gerado no GeneratorPdfJasperRiporter
      * (api.host-pdf); details[0].pdfContent em base64. O número segue em numOcorrencia porque contém "/".
      */
-    @GetMapping("/Ocorrencia/{nunemro}/pdf")
+    @GetMapping("/Ocorrencia/{numero}/pdf")
     public ResponseEntity<APIResponse> pdf(
-            @Parameter(description = "Não usado; o número vai em numOcorrencia (ex.: 0)") @PathVariable String nunemro,
             @Parameter(description = "Número da ocorrência (ex.: 3616/2025/EPB)") @RequestParam String numOcorrencia) {
         return ResponseEntity.ok(pdfSigoAntigoService.gerarPdfOcorrencia(numOcorrencia));
     }

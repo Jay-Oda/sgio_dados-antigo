@@ -5,6 +5,17 @@ Perfil `local`: porta **8084**, Basic Auth `sigo:sigo`, BD `jdbc:postgresql://lo
 
 Swagger UI: `http://localhost:8084/api/swagger-ui/index.html` (api-docs: `http://localhost:8084/api-docs`).
 
+> **Estado a 2026-10-20 — "Sigo dados - antigo"**: o título do Swagger passou para
+> **Sigo dados - antigo** e os 32 controllers listados no final deste ficheiro
+> (agente, assinatura, comando, comarca, esquadra, geografia, health-check,
+> intervenientes, processo, pessoa-enviado, test, tipos-auto, tipo-crime e todos
+> os `sgo-*`) ficaram **comentados no código** — desaparecem do Swagger e os
+> endpoints deixam de responder. Só continuam activos `AntecedenteController`
+> (`/api/sigo/v1/pessoa/...`) e `OcorrenciaNacionalController`
+> (`/api/sigo/v1/Ocorrencia...`). Para reativar: remover o prefixo `// ` de cada
+> linha do ficheiro do controller (cada um tem no topo a nota "CONTROLADOR
+> COMENTADO A PEDIDO").
+
 Todas as respostas de `APIResponse` têm o formato:
 ```json
 { "timestamp": "dd-MM-yyyy HH:mm:ss", "status": true|false, "statusText": "mensagem", "details": [ ... ] }
