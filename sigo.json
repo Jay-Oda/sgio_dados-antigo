@@ -1,0 +1,763 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Sigo dados - antigo",
+    "description": "Sigo dados - antigo (API v1) - antecedentes, ocorrencias e cadastros do SIGO antigo.",
+    "contact": {
+      "name": "Policia Nacional",
+      "url": "http://local",
+      "email": "ady@gov.cv"
+    },
+    "version": "v1"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8084",
+      "description": "Generated server url"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Antecedentes",
+      "description": "Antecedentes da pessoa no SIGO antigo"
+    },
+    {
+      "name": "ocorrencia-nacional-controller",
+      "description": "Ocorrência nacional do SIGO antigo (listagem, opções, histórico, cache e PDF)"
+    }
+  ],
+  "security": [
+    {
+      "basicAuth": []
+    }
+  ],
+  "paths": {
+    "/api/sigo/v1/pessoa/pesquisa/{nome}": {
+      "get": {
+        "tags": [
+          "Antecedentes"
+        ],
+        "summary": "Pesquisa de pessoa completa (nome, alcunha, filiação e data)",
+        "operationId": "pesquisarPessoaCompleta",
+        "parameters": [
+          {
+            "name": "nome",
+            "in": "path",
+            "description": "Nome da pessoa no path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nome",
+            "in": "query",
+            "description": "Nome da pessoa na query; quando vem preenchido, tem prioridade sobre o path",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "alcunha",
+            "in": "query",
+            "description": "Alcunha",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pai",
+            "in": "query",
+            "description": "Nome do pai",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mae",
+            "in": "query",
+            "description": "Nome da mãe",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataNascimento",
+            "in": "query",
+            "description": "Data de nascimento no formato YYYY-MM-DD (ex.: 2026-01-20)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/pessoa/ocorrencia/{numero}/detalhe": {
+      "get": {
+        "tags": [
+          "Antecedentes"
+        ],
+        "summary": "Detalhe da ocorrência pelo número da ocorrência",
+        "operationId": "detalharOcorrencia",
+        "parameters": [
+          {
+            "name": "numero",
+            "in": "path",
+            "description": "Segmento do caminho (posicional); o servidor não o lê — o número real vai em numOcorrencia porque contém '/'. A app envia 0.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "numOcorrencia",
+            "in": "query",
+            "description": "Número da ocorrência (ex.: 14522/2024/EPPP)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/pessoa/ocorrencia": {
+      "get": {
+        "tags": [
+          "Antecedentes"
+        ],
+        "summary": "Ocorrências da pessoa pelo número da ocorrência",
+        "operationId": "pesquisarPorNumOcorrencia",
+        "parameters": [
+          {
+            "name": "numOcorrencia",
+            "in": "query",
+            "description": "Número da ocorrência (ex.: 14522/2024/EPPP)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/pessoa/ocorrencia/{numero}": {
+      "get": {
+        "tags": [
+          "Antecedentes"
+        ],
+        "summary": "Ocorrências da pessoa pelo número da ocorrência",
+        "operationId": "pesquisarPorNumOcorrencia_1",
+        "parameters": [
+          {
+            "name": "numero",
+            "in": "path",
+            "description": "Segmento do caminho (posicional); o servidor não o lê — o número real vai em numOcorrencia porque contém '/'. A app envia 0.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "numOcorrencia",
+            "in": "query",
+            "description": "Número da ocorrência (ex.: 14522/2024/EPPP)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/pessoa/busca/antecidente/{nome}": {
+      "get": {
+        "tags": [
+          "Antecedentes"
+        ],
+        "summary": "Antecedentes por nome, com filiação opcional",
+        "operationId": "buscarPorNome",
+        "parameters": [
+          {
+            "name": "nome",
+            "in": "path",
+            "description": "Nome da pessoa no path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nome",
+            "in": "query",
+            "description": "Nome da pessoa na query; quando vem preenchido, tem prioridade sobre o path",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pai",
+            "in": "query",
+            "description": "Nome do pai",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mae",
+            "in": "query",
+            "description": "Nome da mãe",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataNascimento",
+            "in": "query",
+            "description": "Data de nascimento no formato YYYY-MM-DD",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/pessoa/antecedentes": {
+      "get": {
+        "tags": [
+          "Antecedentes"
+        ],
+        "summary": "Antecedentes por nome e filiação (cache do SIGO antigo)",
+        "operationId": "antecedentesPorFiliacao",
+        "parameters": [
+          {
+            "name": "nome",
+            "in": "query",
+            "description": "Nome da pessoa",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pai",
+            "in": "query",
+            "description": "Nome do pai",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mae",
+            "in": "query",
+            "description": "Nome da mãe",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataNascimento",
+            "in": "query",
+            "description": "Data de nascimento (ex.: 2002-01-22); não conta na comparação",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/pessoa/antecedentes/{oracleId}": {
+      "get": {
+        "tags": [
+          "Antecedentes"
+        ],
+        "summary": "Antecedentes de uma pessoa pelo oracleId",
+        "operationId": "consultar",
+        "parameters": [
+          {
+            "name": "oracleId",
+            "in": "path",
+            "description": "Identificador Oracle da pessoa",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "auto",
+            "in": "query",
+            "description": "Filtro por tipo de auto",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Auto de Denúncia",
+                "Auto de Notícia",
+                "Auto de Detenção",
+                "Auto de Denúncia VBG",
+                "Auto de Identificação"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/pessoa/antecedentes/cache": {
+      "get": {
+        "tags": [
+          "Antecedentes"
+        ],
+        "summary": "Estado da cache de antecedentes do SIGO antigo",
+        "operationId": "estadoCacheAntecedentes",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/Ocorrencia": {
+      "get": {
+        "tags": [
+          "ocorrencia-nacional-controller"
+        ],
+        "operationId": "listar",
+        "summary": "Listagem de ocorrências nacionais com filtros e paginação",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 25
+            }
+          },
+          {
+            "name": "numOcorrencia",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tpAuto",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataInicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataFim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "natureza",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipologia",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipologiaSemelhante",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "enquadramento",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "comando",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "unidade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "comandoSigla",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unidadeSigla",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "interveniente",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/Ocorrencia/{numero}/pdf": {
+      "get": {
+        "tags": [
+          "ocorrencia-nacional-controller"
+        ],
+        "operationId": "pdf",
+        "summary": "PDF do auto da ocorrência (base64 em details[0].pdfContent)",
+        "parameters": [
+          {
+            "name": "numero",
+            "in": "path",
+            "description": "Segmento do caminho (posicional); o servidor não o lê — o número real vai em numOcorrencia porque contém '/'.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "numOcorrencia",
+            "in": "query",
+            "description": "Número da ocorrência (ex.: 3616/2025/EPB)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/Ocorrencia/opcoes": {
+      "get": {
+        "tags": [
+          "ocorrencia-nacional-controller"
+        ],
+        "operationId": "opcoes",
+        "summary": "Opções de filtro das ocorrências (tipos de auto, estados, naturezas, comandos…)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/Ocorrencia/historico": {
+      "get": {
+        "tags": [
+          "ocorrencia-nacional-controller"
+        ],
+        "operationId": "historico",
+        "summary": "Histórico da ocorrência pelo número",
+        "parameters": [
+          {
+            "name": "numOcorrencia",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sigo/v1/Ocorrencia/cache": {
+      "get": {
+        "tags": [
+          "ocorrencia-nacional-controller"
+        ],
+        "operationId": "estadoCache",
+        "summary": "Estado da cache de ocorrências do SIGO antigo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "HTTP Basic obrigatório (SecurityConfig: anyRequest().authenticated() + httpBasic). Em local a app SIGOIC envia o par sigo:sigo (c2lnbzpzaWdv) via AuthInterceptor."
+      }
+    },
+    "schemas": {
+      "APIResponse": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "boolean"
+          },
+          "statusText": {
+            "type": "string"
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "processNumber": {
+            "type": "string"
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      }
+    }
+  }
+}
